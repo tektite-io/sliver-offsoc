@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"tailscale.com/tailcfg"
+	"tailscale.com/tka"
 	"tailscale.com/types/key"
 	"tailscale.com/types/ptr"
 	"tailscale.com/types/views"
@@ -25,7 +26,7 @@ import (
 	"tailscale.com/version"
 )
 
-//go:generate go run tailscale.com/cmd/cloner  -clonefunc=false -type=TKAFilteredPeer
+//go:generate go run tailscale.com/cmd/cloner  -clonefunc=false -type=TKAPeer
 
 // Status represents the entire state of the IPN network.
 type Status struct {
@@ -93,15 +94,14 @@ type TKAKey struct {
 	Votes    uint
 }
 
-// TKAFilteredPeer describes a peer which was removed from the netmap
-// (i.e. no connectivity) because it failed tailnet lock
-// checks.
-type TKAFilteredPeer struct {
-	Name         string // DNS
-	ID           tailcfg.NodeID
-	StableID     tailcfg.StableNodeID
-	TailscaleIPs []netip.Addr // Tailscale IP(s) assigned to this node
-	NodeKey      key.NodePublic
+// TKAPeer describes a peer and its network lock details.
+type TKAPeer struct {
+	Name             string // DNS
+	ID               tailcfg.NodeID
+	StableID         tailcfg.StableNodeID
+	TailscaleIPs     []netip.Addr // Tailscale IP(s) assigned to this node
+	NodeKey          key.NodePublic
+	NodeKeySignature tka.NodeKeySignature
 }
 
 // NetworkLockStatus represents whether network-lock is enabled,
@@ -126,14 +126,21 @@ type NetworkLockStatus struct {
 	// NodeKeySigned is true if our node is authorized by network-lock.
 	NodeKeySigned bool
 
+	// NodeKeySignature is the current signature of this node's key.
+	NodeKeySignature *tka.NodeKeySignature
+
 	// TrustedKeys describes the keys currently trusted to make changes
 	// to network-lock.
 	TrustedKeys []TKAKey
 
+	// VisiblePeers describes peers which are visible in the netmap that
+	// have valid Tailnet Lock signatures signatures.
+	VisiblePeers []*TKAPeer
+
 	// FilteredPeers describes peers which were removed from the netmap
 	// (i.e. no connectivity) because they failed tailnet lock
 	// checks.
-	FilteredPeers []*TKAFilteredPeer
+	FilteredPeers []*TKAPeer
 
 	// StateID is a nonce associated with the network lock authority,
 	// generated upon enablement. This field is not populated if the
@@ -209,6 +216,11 @@ type PeerStatusLite struct {
 }
 
 // PeerStatus describes a peer node and its current state.
+// WARNING: The fields in PeerStatus are merged by the AddPeer method in the StatusBuilder.
+// When adding a new field to PeerStatus, you must update AddPeer to handle merging
+// the new field. The AddPeer function is responsible for combining multiple updates
+// to the same peer, and any new field that is not merged properly may lead to
+// inconsistencies or lost data in the peer status.
 type PeerStatus struct {
 	ID        tailcfg.StableNodeID
 	PublicKey key.NodePublic
@@ -263,6 +275,12 @@ type PeerStatus struct {
 	// PeerAPIURL are the URLs of the node's PeerAPI servers.
 	PeerAPIURL []string
 
+	// TaildropTargetStatus represents the node's eligibility to have files shared to it.
+	TaildropTarget TaildropTargetStatus
+
+	// Reason why this peer cannot receive files. Empty if CanReceiveFiles=true
+	NoFileSharingReason string
+
 	// Capabilities are capabilities that the node has.
 	// They're free-form strings, but should be in the form of URLs/URIs
 	// such as:
@@ -310,6 +328,21 @@ type PeerStatus struct {
 
 	Location *tailcfg.Location `json:",omitempty"`
 }
+
+type TaildropTargetStatus int
+
+const (
+	TaildropTargetUnknown TaildropTargetStatus = iota
+	TaildropTargetAvailable
+	TaildropTargetNoNetmapAvailable
+	TaildropTargetIpnStateNotRunning
+	TaildropTargetMissingCap
+	TaildropTargetOffline
+	TaildropTargetNoPeerInfo
+	TaildropTargetUnsupportedOS
+	TaildropTargetNoPeerAPI
+	TaildropTargetOwnedByOtherUser
+)
 
 // HasCap reports whether ps has the given capability.
 func (ps *PeerStatus) HasCap(cap tailcfg.NodeCapability) bool {
@@ -360,7 +393,7 @@ func (sb *StatusBuilder) MutateSelfStatus(f func(*PeerStatus)) {
 }
 
 // AddUser adds a user profile to the status.
-func (sb *StatusBuilder) AddUser(id tailcfg.UserID, up tailcfg.UserProfile) {
+func (sb *StatusBuilder) AddUser(id tailcfg.UserID, up tailcfg.UserProfileView) {
 	if sb.locked {
 		log.Printf("[unexpected] ipnstate: AddUser after Locked")
 		return
@@ -370,7 +403,7 @@ func (sb *StatusBuilder) AddUser(id tailcfg.UserID, up tailcfg.UserProfile) {
 		sb.st.User = make(map[tailcfg.UserID]tailcfg.UserProfile)
 	}
 
-	sb.st.User[id] = up
+	sb.st.User[id] = *up.AsStruct()
 }
 
 // AddIP adds a Tailscale IP address to the status.
@@ -504,6 +537,9 @@ func (sb *StatusBuilder) AddPeer(peer key.NodePublic, st *PeerStatus) {
 	}
 	if v := st.Capabilities; v != nil {
 		e.Capabilities = v
+	}
+	if v := st.TaildropTarget; v != TaildropTargetUnknown {
+		e.TaildropTarget = v
 	}
 	e.Location = st.Location
 }
@@ -643,6 +679,8 @@ func osEmoji(os string) string {
 		return "🐡"
 	case "illumos":
 		return "☀️"
+	case "solaris":
+		return "🌤️"
 	}
 	return "👽"
 }
