@@ -22,8 +22,8 @@ func (bs ByteString) Bytes() []byte {
 
 // MarshalCBOR encodes ByteString as CBOR byte string (major type 2).
 func (bs ByteString) MarshalCBOR() ([]byte, error) {
-	e := getEncoderBuffer()
-	defer putEncoderBuffer(e)
+	e := getEncodeBuffer()
+	defer putEncodeBuffer(e)
 
 	// Encode length
 	encodeHead(e, byte(cborTypeByteString), uint64(len(bs)))
@@ -57,6 +57,7 @@ func (bs *ByteString) UnmarshalCBOR(data []byte) error {
 		return &UnmarshalTypeError{CBORType: typ.String(), GoType: typeByteString.String()}
 	}
 
-	*bs = ByteString(d.parseByteString())
+	b, _ := d.parseByteString()
+	*bs = ByteString(b)
 	return nil
 }
