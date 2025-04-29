@@ -60,7 +60,7 @@ require (
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/driver/sqlite v1.5.7
-	gorm.io/gorm v1.25.12
+	gorm.io/gorm v1.26.0
 	gvisor.dev/gvisor v0.0.0-20250205023644-9414b50a5633
 	modernc.org/sqlite v1.30.1
 	tailscale.com v1.82.5
