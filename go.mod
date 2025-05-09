@@ -34,8 +34,8 @@ require (
 	github.com/moloch--/asciicast v0.1.1
 	github.com/moloch--/memmod v0.0.0-20230225130813-fd77d905589e
 	github.com/ncruces/go-sqlite3 v0.25.1
-	github.com/reeflective/console v0.1.22
-	github.com/reeflective/readline v1.1.2
+	github.com/reeflective/console v0.1.24
+	github.com/reeflective/readline v1.1.3
 	github.com/rsteube/carapace v0.46.3-0.20231214181515-27e49f3c3b69
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
@@ -92,6 +92,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.13 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.13 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
+	github.com/carapace-sh/carapace v1.7.1 // indirect
+	github.com/carapace-sh/carapace-shlex v1.0.1 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/coder/websocket v1.8.12 // indirect
 	github.com/coreos/go-iptables v0.7.1-0.20240112124308-65c67c9f46e6 // indirect
