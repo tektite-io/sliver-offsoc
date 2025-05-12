@@ -803,7 +803,7 @@ github.com/tetratelabs/wazero/sys
 # github.com/thedevsaddam/gojsonq/v2 v2.5.2
 ## explicit; go 1.13
 github.com/thedevsaddam/gojsonq/v2
-# github.com/things-go/go-socks5 v0.0.5
+# github.com/things-go/go-socks5 v0.0.6
 ## explicit; go 1.18
 github.com/things-go/go-socks5
 github.com/things-go/go-socks5/bufferpool
